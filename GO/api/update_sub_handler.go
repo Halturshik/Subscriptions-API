@@ -3,13 +3,13 @@ package api
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/Halturshik/EM-test-task/GO/database"
+	"github.com/Halturshik/EM-test-task/GO/logger"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -32,21 +32,21 @@ func (api *API) UpdateSubscriptionHandler(w http.ResponseWriter, r *http.Request
 	serviceName := strings.TrimSpace(chi.URLParam(r, "service_name"))
 
 	if strings.TrimSpace(userIDStr) == "" || serviceName == "" {
-		log.Println("Ошибка: не указан uuid пользователя или название сервиса")
+		logger.Warn("Ошибка: не указан uuid пользователя или название сервиса")
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Не указан идентификатор пользователя или название сервиса подписки"})
 		return
 	}
 
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		log.Println("Ошибка: некорректный формат uuid:", err)
+		logger.Warn("Ошибка: некорректный формат uuid: %v", err)
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Некорректный формат идентификатора пользователя"})
 		return
 	}
 
 	reSN := regexp.MustCompile(`^[A-Za-z0-9 ]+$`)
 	if !reSN.MatchString(serviceName) {
-		log.Println("Ошибка: в названии сервиса используются недопустимые символы")
+		logger.Warn("Ошибка: в названии сервиса используются недопустимые символы")
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Недопустимое название сервиса: используйте только буквы, цифры и пробелы"})
 		return
 	}
@@ -57,20 +57,20 @@ func (api *API) UpdateSubscriptionHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Println("Ошибка: не удалось прочитать тело запроса", err)
+		logger.Warn("Ошибка: не удалось прочитать тело запроса: %v", err)
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Некорректно оформлено тело запроса"})
 		return
 	}
 
 	if req.NewPrice == nil && req.NewEndDate == nil {
-		log.Println("Ошибка: не указаны поля для изменения")
+		logger.Warn("Ошибка: не указаны поля для изменения")
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Не заполнены поля для обновления"})
 		return
 	}
 
 	validPrices := map[int]bool{50: true, 100: true, 200: true}
 	if req.NewPrice != nil && !validPrices[*req.NewPrice] {
-		log.Println("Ошибка: выбран несуществующий уровень подписки")
+		logger.Warn("Ошибка: выбран несуществующий уровень подписки")
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Выберите допустимый уровень подписки: Базовый (50), Продвинутый (100), Премиум (200)"})
 		return
 	}
@@ -81,7 +81,7 @@ func (api *API) UpdateSubscriptionHandler(w http.ResponseWriter, r *http.Request
 		if strings.TrimSpace(*req.NewEndDate) != "" {
 			t, err := time.Parse("01-2006", *req.NewEndDate)
 			if err != nil {
-				log.Println("Ошибка: некорректный формат даты конца подписки")
+				logger.Warn("Ошибка: некорректный формат даты конца подписки")
 				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Неверный формат даты окончания действия подписки (используйте месяц-год)"})
 				return
 			}
@@ -89,7 +89,7 @@ func (api *API) UpdateSubscriptionHandler(w http.ResponseWriter, r *http.Request
 			now := time.Now()
 			currentMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 			if t.Before(currentMonth) {
-				log.Println("Ошибка: дата конца подписки в прошлом")
+				logger.Warn("Ошибка: дата конца подписки в прошлом")
 				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Дата окончания подписки не может быть раньше текущего месяца"})
 				return
 			}
@@ -102,18 +102,18 @@ func (api *API) UpdateSubscriptionHandler(w http.ResponseWriter, r *http.Request
 	priceChanged, endDateChanged, opType, err := api.Store.UpdateSubscription(r.Context(), userID, serviceName, req.NewPrice, newEndDateParsed, newEndDateProvided)
 	if err != nil {
 		if errors.Is(err, database.ErrSubNotFound) {
-			log.Println("Ошибка: активная подписка не найдена")
+			logger.Warn("Ошибка: активная подписка не найдена")
 			writeJSON(w, http.StatusNotFound, map[string]any{"error": "Активная подписка не найдена"})
 			return
 		}
 
-		log.Println("Ошибка при обновлении подписки:", err)
+		logger.Error("Ошибка при обновлении подписки: %v", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Не удалось обновить подписку. Повторите попытку позже"})
 		return
 	}
 
 	if opType == "" && !priceChanged && !endDateChanged {
-		log.Println("Ошибка: подписка уже соответствует поступившим параметрам")
+		logger.Warn("Ошибка: подписка уже соответствует поступившим параметрам")
 		writeJSON(w, http.StatusOK, map[string]any{"message": "Выбранная подписка уже соответствует указанным параметрам"})
 		return
 	}
@@ -136,4 +136,8 @@ func (api *API) UpdateSubscriptionHandler(w http.ResponseWriter, r *http.Request
 	msg := strings.Join(parts, ". ")
 
 	writeJSON(w, http.StatusOK, map[string]any{"message": msg})
+
+	if opType != "" || priceChanged || endDateChanged {
+		logger.Info("Обновлена подписка пользователя %s на сервис %s: тип операции=%s, priceChanged=%t, endDateChanged=%t", userID, serviceName, opType, priceChanged, endDateChanged)
+	}
 }

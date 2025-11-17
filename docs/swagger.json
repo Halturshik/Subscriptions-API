@@ -1,8 +1,16 @@
 {
     "swagger": "2.0",
     "info": {
-        "contact": {}
+        "description": "REST API для управления онлайн-подписками пользователей",
+        "title": "Subscriptions API",
+        "contact": {
+            "name": "Artem",
+            "email": "disaer21@yandex.ru"
+        },
+        "version": "2.0"
     },
+    "host": "localhost:8080",
+    "basePath": "/",
     "paths": {
         "/subscriptions": {
             "post": {
@@ -58,7 +66,7 @@
         },
         "/users/{user_id}/subscriptions": {
             "get": {
-                "description": "Возвращает список подписок для указанного user_id",
+                "description": "Возвращает список подписок для указанного user_id. Можно фильтровать по статусу и пагинировать.",
                 "produces": [
                     "application/json"
                 ],
@@ -73,6 +81,24 @@
                         "name": "user_id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "enum": [
+                            "active",
+                            "archived"
+                        ],
+                        "type": "string",
+                        "default": "active",
+                        "description": "Статус подписки",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Номер страницы для пагинации",
+                        "name": "page",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -86,7 +112,7 @@
                         }
                     },
                     "400": {
-                        "description": "Некорректный UUID пользователя или service_name",
+                        "description": "Некорректный UUID пользователя, service_name, статус или номер страницы",
                         "schema": {
                             "$ref": "#/definitions/api.ErrorResponse"
                         }
@@ -102,7 +128,7 @@
         },
         "/users/{user_id}/subscriptions/{service_name}": {
             "get": {
-                "description": "Возвращает список подписок для указанного user_id",
+                "description": "Возвращает список подписок для указанного user_id. Можно фильтровать по статусу и пагинировать.",
                 "produces": [
                     "application/json"
                 ],
@@ -117,6 +143,24 @@
                         "name": "user_id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "enum": [
+                            "active",
+                            "archived"
+                        ],
+                        "type": "string",
+                        "default": "active",
+                        "description": "Статус подписки",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Номер страницы для пагинации",
+                        "name": "page",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -130,7 +174,7 @@
                         }
                     },
                     "400": {
-                        "description": "Некорректный UUID пользователя или service_name",
+                        "description": "Некорректный UUID пользователя, service_name, статус или номер страницы",
                         "schema": {
                             "$ref": "#/definitions/api.ErrorResponse"
                         }

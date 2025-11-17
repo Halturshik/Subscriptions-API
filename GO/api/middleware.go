@@ -1,9 +1,10 @@
 package api
 
 import (
-	"log"
 	"net/http"
 	"time"
+
+	"github.com/Halturshik/EM-test-task/GO/logger"
 )
 
 type logResponseWriter struct {
@@ -20,18 +21,18 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
-		lrw := &logResponseWriter{ResponseWriter: w, statusCode: 200}
+		lrw := &logResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 
-		log.Printf("→ %s %s", r.Method, r.URL.Path)
+		logger.Info("→ %s %s", r.Method, r.URL.Path)
 
 		next.ServeHTTP(lrw, r)
 
 		duration := time.Since(start)
 
 		if lrw.statusCode >= 400 {
-			log.Printf("← %s %s завершился с ошибкой %d (заняло %s)", r.Method, r.URL.Path, lrw.statusCode, duration)
+			logger.Error("← %s %s завершился с ошибкой %d (заняло %s)", r.Method, r.URL.Path, lrw.statusCode, duration)
 		} else {
-			log.Printf("← %s %s (заняло %s)", r.Method, r.URL.Path, duration)
+			logger.Info("← %s %s (заняло %s)", r.Method, r.URL.Path, duration)
 		}
 	})
 }

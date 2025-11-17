@@ -1,7 +1,7 @@
 package api
 
 // @title Subscriptions API
-// @version 1.0
+// @version 2.0
 // @description REST API для управления онлайн-подписками пользователей
 // @host localhost:8080
 // @BasePath /
@@ -10,16 +10,29 @@ package api
 // @contact.email disaer21@yandex.ru
 
 import (
+	"context"
+	"time"
+
 	"github.com/Halturshik/EM-test-task/GO/database"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
-type API struct {
-	Store *database.Store
+type Store interface {
+	CreateSubscription(ctx context.Context, s *database.Subs) error
+	UpdateSubscription(ctx context.Context, userID uuid.UUID, serviceName string, newPrice *int, newEndDate *time.Time, newEndDateProvided bool) (bool, bool, string, error)
+	DeleteSubscription(ctx context.Context, userID uuid.UUID, serviceName string, startDate time.Time) error
+	GetSubscriptions(ctx context.Context, userID uuid.UUID, serviceName string, status string, limit int, offset int) ([]database.Subs, error)
+	CalculateTotalSubscriptionCost(ctx context.Context, userID uuid.UUID, serviceName string, from, to time.Time) (int, string, error)
+	SyncSubscriptionPrices(ctx context.Context) error
 }
 
-func NewAPI(store *database.Store) *API {
+type API struct {
+	Store Store
+}
+
+func NewAPI(store Store) *API {
 	return &API{Store: store}
 }
 

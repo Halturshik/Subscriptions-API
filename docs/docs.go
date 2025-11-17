@@ -9,7 +9,10 @@ const docTemplate = `{
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
-        "contact": {},
+        "contact": {
+            "name": "Artem",
+            "email": "disaer21@yandex.ru"
+        },
         "version": "{{.Version}}"
     },
     "host": "{{.Host}}",
@@ -69,7 +72,7 @@ const docTemplate = `{
         },
         "/users/{user_id}/subscriptions": {
             "get": {
-                "description": "Возвращает список подписок для указанного user_id",
+                "description": "Возвращает список подписок для указанного user_id. Можно фильтровать по статусу и пагинировать.",
                 "produces": [
                     "application/json"
                 ],
@@ -84,6 +87,24 @@ const docTemplate = `{
                         "name": "user_id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "enum": [
+                            "active",
+                            "archived"
+                        ],
+                        "type": "string",
+                        "default": "active",
+                        "description": "Статус подписки",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Номер страницы для пагинации",
+                        "name": "page",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -97,7 +118,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Некорректный UUID пользователя или service_name",
+                        "description": "Некорректный UUID пользователя, service_name, статус или номер страницы",
                         "schema": {
                             "$ref": "#/definitions/api.ErrorResponse"
                         }
@@ -113,7 +134,7 @@ const docTemplate = `{
         },
         "/users/{user_id}/subscriptions/{service_name}": {
             "get": {
-                "description": "Возвращает список подписок для указанного user_id",
+                "description": "Возвращает список подписок для указанного user_id. Можно фильтровать по статусу и пагинировать.",
                 "produces": [
                     "application/json"
                 ],
@@ -128,6 +149,24 @@ const docTemplate = `{
                         "name": "user_id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "enum": [
+                            "active",
+                            "archived"
+                        ],
+                        "type": "string",
+                        "default": "active",
+                        "description": "Статус подписки",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Номер страницы для пагинации",
+                        "name": "page",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -141,7 +180,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Некорректный UUID пользователя или service_name",
+                        "description": "Некорректный UUID пользователя, service_name, статус или номер страницы",
                         "schema": {
                             "$ref": "#/definitions/api.ErrorResponse"
                         }
@@ -476,12 +515,12 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "",
-	Host:             "",
-	BasePath:         "",
+	Version:          "2.0",
+	Host:             "localhost:8080",
+	BasePath:         "/",
 	Schemes:          []string{},
-	Title:            "",
-	Description:      "",
+	Title:            "Subscriptions API",
+	Description:      "REST API для управления онлайн-подписками пользователей",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 }

@@ -23,19 +23,27 @@ func (s *Store) CalculateTotalSubscriptionCost(ctx context.Context, userID uuid.
 		return 0, "no_subscription", nil
 	}
 
+	now := time.Now()
+	endOfCurrentMonth := time.Date(now.Year(), now.Month()+1, 0, 0, 0, 0, 0, time.UTC)
+
 	query := `
-	SELECT sp.price, sp.valid_from, sp.valid_to
-	FROM subscriptions s
-	JOIN subscription_prices sp ON sp.subscription_id = s.id
-	WHERE s.user_id = $1
-	  AND s.service_name = $2
-	  AND s.start_date <= $3
-	  AND s.end_date >= $4
-	  AND sp.valid_from <= $3
-	  AND (sp.valid_to IS NULL OR sp.valid_to >= $4)
-	ORDER BY sp.valid_from
+		SELECT  
+			sp.price,
+			GREATEST(sp.valid_from, s.start_date, $3) AS overlap_start,
+			LEAST(sp.valid_to, s.end_date, $4, $5) AS overlap_end
+		FROM subscriptions s
+		JOIN subscription_prices sp 
+			ON sp.subscription_id = s.id
+		WHERE s.user_id = $1
+		  AND s.service_name = $2
+		  AND s.start_date <= $4
+		  AND s.end_date   >= $3
+		  AND sp.valid_from <= $4
+		  AND sp.valid_to   >= $3
+		ORDER BY overlap_start;
 	`
-	rows, err := s.DB.QueryContext(ctx, query, userID, serviceName, to, from)
+
+	rows, err := s.DB.QueryContext(ctx, query, userID, serviceName, from, to, endOfCurrentMonth)
 	if err != nil {
 		return 0, "", err
 	}
@@ -46,17 +54,18 @@ func (s *Store) CalculateTotalSubscriptionCost(ctx context.Context, userID uuid.
 
 	for rows.Next() {
 		var price int
-		var validFrom, validTo time.Time
+		var overlapStart, overlapEnd time.Time
 
-		if err := rows.Scan(&price, &validFrom, &validTo); err != nil {
+		if err := rows.Scan(&price, &overlapStart, &overlapEnd); err != nil {
 			return 0, "", err
 		}
 
-		start := maxTime(validFrom, from)
-		end := minTime(validTo, to)
+		if overlapEnd.Before(overlapStart) {
+			continue
+		}
 
-		if !end.Before(start) {
-			months := monthsBetween(start, end)
+		months := countMonths(overlapStart, overlapEnd)
+		if months > 0 {
 			total += price * months
 			hasOverlap = true
 		}
@@ -73,22 +82,8 @@ func (s *Store) CalculateTotalSubscriptionCost(ctx context.Context, userID uuid.
 	return total, "ok", nil
 }
 
-func monthsBetween(start, end time.Time) int {
+func countMonths(start, end time.Time) int {
 	yearDiff := end.Year() - start.Year()
 	monthDiff := int(end.Month()) - int(start.Month())
 	return yearDiff*12 + monthDiff + 1
-}
-
-func maxTime(a, b time.Time) time.Time {
-	if a.After(b) {
-		return a
-	}
-	return b
-}
-
-func minTime(a, b time.Time) time.Time {
-	if a.Before(b) {
-		return a
-	}
-	return b
 }

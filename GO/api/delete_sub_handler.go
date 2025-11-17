@@ -3,13 +3,13 @@ package api
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/Halturshik/EM-test-task/GO/database"
+	"github.com/Halturshik/EM-test-task/GO/logger"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -32,21 +32,21 @@ func (api *API) DeleteSubscriptionHandler(w http.ResponseWriter, r *http.Request
 	serviceName := strings.TrimSpace(chi.URLParam(r, "service_name"))
 
 	if strings.TrimSpace(userIDStr) == "" || serviceName == "" {
-		log.Println("Ошибка: не указан uuid пользователя или название сервиса")
+		logger.Warn("Ошибка: не указан uuid пользователя или название сервиса")
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Не указан идентификатор пользователя или название сервиса подписки"})
 		return
 	}
 
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		log.Println("Ошибка: некорректный формат uuid:", err)
+		logger.Warn("Ошибка: некорректный формат uuid: %v", err)
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Некорректный формат идентификатора пользователя"})
 		return
 	}
 
 	reSN := regexp.MustCompile(`^[A-Za-z0-9 ]+$`)
 	if !reSN.MatchString(serviceName) {
-		log.Println("Ошибка: в названии сервиса используются недопустимые символы")
+		logger.Warn("Ошибка: в названии сервиса используются недопустимые символы")
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Недопустимое название сервиса: используйте только буквы, цифры и пробелы"})
 		return
 	}
@@ -57,20 +57,20 @@ func (api *API) DeleteSubscriptionHandler(w http.ResponseWriter, r *http.Request
 
 	var req deleteReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Println("Ошибка: не удалось прочитать тело запроса", err)
+		logger.Warn("Ошибка: не удалось прочитать тело запроса: %v", err)
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Некорректно оформлено тело запроса"})
 		return
 	}
 
 	if strings.TrimSpace(req.StartDate) == "" {
-		log.Println("Ошибка: не указана дата начала подписки для удаления")
+		logger.Warn("Ошибка: не указана дата начала подписки для удаления")
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Не указана дата начала действия подписки, которую вы хотите удалить"})
 		return
 	}
 
 	startDate, err := time.Parse("01-2006", req.StartDate)
 	if err != nil {
-		log.Println("Ошибка: некорректный формат даты начала подписки для удаления")
+		logger.Warn("Ошибка: некорректный формат даты начала подписки для удаления")
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Неверный формат даты начала действия подписки (используйте месяц-год)"})
 		return
 	}
@@ -78,14 +78,15 @@ func (api *API) DeleteSubscriptionHandler(w http.ResponseWriter, r *http.Request
 	err = api.Store.DeleteSubscription(r.Context(), userID, serviceName, startDate)
 	if err != nil {
 		if errors.Is(err, database.ErrSubNotFound) {
-			log.Println("Ошибка: подписка не найдена")
+			logger.Warn("Ошибка: подписка не найдена")
 			writeJSON(w, http.StatusNotFound, map[string]any{"error": "Подписка не найдена"})
 			return
 		}
-		log.Println("Ошибка при удалении подписки:", err)
+		logger.Error("Ошибка при удалении подписки: %v", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Ошибка при удалении подписки. Повторите попытку позже"})
 		return
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"message": "Подписка успешно удалена"})
+	logger.Info("Удалена подписка пользователя %s на сервис %s с датой начала %s", userID, serviceName, req.StartDate)
 }

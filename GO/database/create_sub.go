@@ -2,8 +2,6 @@ package database
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"time"
 )
 
@@ -13,24 +11,45 @@ func (s *Store) CreateSubscription(ctx context.Context, sub *Subs) error {
 		sub.EndDate = &t
 	}
 
-	var activeStart, activeEnd *time.Time
-	checkConflictQuery := `
-		SELECT start_date, end_date
-        FROM subscriptions
-        WHERE user_id=$1 AND service_name=$2
-          AND (end_date IS NULL OR end_date >= CURRENT_DATE)
-        LIMIT 1
-	`
-
-	err := s.DB.QueryRowContext(ctx, checkConflictQuery, sub.UserID, sub.ServiceName).Scan(&activeStart, &activeEnd)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
 		return err
 	}
+	defer tx.Rollback()
 
-	if activeStart != nil {
-		if sub.EndDate == nil || !sub.EndDate.Before(*activeStart) {
+	today := time.Now().Truncate(24 * time.Hour)
+
+	if !sub.StartDate.Before(today) {
+		var activeCount int
+		activeConflictQuery := `
+			SELECT COUNT(1)
+			FROM subscriptions
+			WHERE user_id = $1 AND service_name = $2
+			  AND end_date >= CURRENT_DATE
+		`
+		err = tx.QueryRowContext(ctx, activeConflictQuery, sub.UserID, sub.ServiceName).Scan(&activeCount)
+		if err != nil {
+			return err
+		}
+		if activeCount > 0 {
 			return ErrSubIsExist
 		}
+	}
+
+	var conflictCount int
+	dateConflictQuery := `
+		SELECT COUNT(1)
+		FROM subscriptions
+		WHERE user_id = $1 AND service_name = $2
+		  AND NOT ($3 > end_date OR $4 < start_date)
+	`
+
+	err = tx.QueryRowContext(ctx, dateConflictQuery, sub.UserID, sub.ServiceName, sub.StartDate, sub.EndDate).Scan(&conflictCount)
+	if err != nil {
+		return err
+	}
+	if conflictCount > 0 {
+		return ErrSubOverlapExist
 	}
 
 	query := `
@@ -40,7 +59,7 @@ func (s *Store) CreateSubscription(ctx context.Context, sub *Subs) error {
 	`
 
 	var subID int
-	err = s.DB.QueryRowContext(ctx, query, sub.UserID, sub.ServiceName, sub.Price, sub.StartDate, sub.EndDate).Scan(&subID)
+	err = tx.QueryRowContext(ctx, query, sub.UserID, sub.ServiceName, sub.Price, sub.StartDate, sub.EndDate).Scan(&subID)
 	if err != nil {
 		return err
 	}
@@ -50,7 +69,10 @@ func (s *Store) CreateSubscription(ctx context.Context, sub *Subs) error {
 		VALUES ($1, $2, $3, $4)
 	`
 
-	_, err = s.DB.ExecContext(ctx, priceQuery, subID, sub.Price, sub.StartDate, sub.EndDate)
-	return err
+	_, err = tx.ExecContext(ctx, priceQuery, subID, sub.Price, sub.StartDate, sub.EndDate)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 
 }

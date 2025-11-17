@@ -1,3 +1,4 @@
+basePath: /
 definitions:
   api.CreateSubRequest:
     properties:
@@ -88,8 +89,14 @@ definitions:
           изменена
         type: string
     type: object
+host: localhost:8080
 info:
-  contact: {}
+  contact:
+    email: disaer21@yandex.ru
+    name: Artem
+  description: REST API для управления онлайн-подписками пользователей
+  title: Subscriptions API
+  version: "2.0"
 paths:
   /subscriptions:
     post:
@@ -127,13 +134,27 @@ paths:
       - subscriptions
   /users/{user_id}/subscriptions:
     get:
-      description: Возвращает список подписок для указанного user_id
+      description: Возвращает список подписок для указанного user_id. Можно фильтровать
+        по статусу и пагинировать.
       parameters:
       - description: UUID пользователя
         in: path
         name: user_id
         required: true
         type: string
+      - default: active
+        description: Статус подписки
+        enum:
+        - active
+        - archived
+        in: query
+        name: status
+        type: string
+      - default: 1
+        description: Номер страницы для пагинации
+        in: query
+        name: page
+        type: integer
       produces:
       - application/json
       responses:
@@ -144,7 +165,8 @@ paths:
               $ref: '#/definitions/api.SubResponse'
             type: array
         "400":
-          description: Некорректный UUID пользователя или service_name
+          description: Некорректный UUID пользователя, service_name, статус или номер
+            страницы
           schema:
             $ref: '#/definitions/api.ErrorResponse'
         "500":
@@ -199,13 +221,27 @@ paths:
       tags:
       - subscriptions
     get:
-      description: Возвращает список подписок для указанного user_id
+      description: Возвращает список подписок для указанного user_id. Можно фильтровать
+        по статусу и пагинировать.
       parameters:
       - description: UUID пользователя
         in: path
         name: user_id
         required: true
         type: string
+      - default: active
+        description: Статус подписки
+        enum:
+        - active
+        - archived
+        in: query
+        name: status
+        type: string
+      - default: 1
+        description: Номер страницы для пагинации
+        in: query
+        name: page
+        type: integer
       produces:
       - application/json
       responses:
@@ -216,7 +252,8 @@ paths:
               $ref: '#/definitions/api.SubResponse'
             type: array
         "400":
-          description: Некорректный UUID пользователя или service_name
+          description: Некорректный UUID пользователя, service_name, статус или номер
+            страницы
           schema:
             $ref: '#/definitions/api.ErrorResponse'
         "500":

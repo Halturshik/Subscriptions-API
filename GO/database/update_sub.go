@@ -23,7 +23,7 @@ func (s *Store) UpdateSubscription(ctx context.Context, userID uuid.UUID, servic
 		FROM subscriptions
 		WHERE user_id = $1
 		  AND service_name = $2
-		  AND (end_date IS NULL OR end_date >= CURRENT_DATE)
+		  AND end_date >= CURRENT_DATE
 	`
 	err = tx.QueryRowContext(ctx, query, userID, serviceName).Scan(
 		&current.ID, &current.UserID, &current.ServiceName,

@@ -25,4 +25,5 @@ type SubsPriceHistory struct {
 }
 
 var ErrSubIsExist = errors.New("подписка существует")
+var ErrSubOverlapExist = errors.New("подписка пересекается с другой")
 var ErrSubNotFound = errors.New("подписка не найдена")
